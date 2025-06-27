@@ -1,0 +1,492 @@
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r echo=FALSE, error=TRUE}
+if(!dplyr) install.packages("dplyr",repos = "http://cran.us.r-project.org")
+if( !readxl) install.packages("readxl",repos = "http://cran.us.r-project.org")
+install.packages("ggpubr",
+                 repos = c("https://cran.rediris.org/", "https://cloud.r-project.org/"),
+                 dependencies = TRUE)
+library("dplyr")
+library(readxl)
+library(ggplot2)
+library(ggpubr)
+library(tseries)
+library(vars)
+library(tsDyn)
+library(urca)
+
+
+#wczytywanie danych
+dane <- read_excel("dane_miesieczne.xlsx", 
+    col_types = c("date", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric"))
+
+```
+### **Przekształcenie danych** ###
+
+```{r} 
+dane$BTC <- log(dane$BTC)
+dane$ETH <- log(dane$ETH)
+dane$SP500D <- log(dane$SP500D)
+dane$FTSE100D <- log(dane$FTSE100D)
+dane$HSID <-log(dane$HSID)
+dane$DAXD <- log (dane$DAXD)
+```
+
+### **Wykresy** ###
+```{r, echo = FALSE}
+p1 <- ggplot(data = dane) + geom_line(aes(x = Data, y = BTC)) + ggtitle("Bitcoin")
+p2 <- ggplot(data = dane) + geom_line(aes(x = Data, y = ETH)) + ggtitle("Ethereum")
+p3 <- ggplot(data = dane) + geom_line(aes(x = Data, y = SP500D)) + ggtitle("S&P 500")
+p4 <- ggplot(data = dane) + geom_line(aes(x = Data, y = FTSE100D)) + ggtitle("FTSE 100")
+p5 <- ggplot(data = dane) + geom_line(aes(x = Data, y = HSID)) + ggtitle("HSI")
+p6 <- ggplot(data = dane) + geom_line(aes(x = Data, y = DAXD)) + ggtitle("DAX")
+
+figure <- ggarrange(p1, p2, p3, p4, p5,p6,ncol = 2, nrow = 3)
+figure
+
+```
+### **Wyliczenie przyrostów** ###
+```{r}
+przyrosty <- data.frame(matrix(0, 113, 7))
+names(przyrosty) <- names(dane)
+przyrosty[, 1] <- dane[, 1]
+
+for (j in 2:7){
+  for (i in 2:113)
+  {
+    przyrosty[i, j] <- dane[i, j] - dane[i-1, j]
+  }
+}
+przyrosty <- przyrosty[-1, ]
+```
+
+### **Wykresy przyrostów** ###
+
+```{r, echo = FALSE}
+p1 <- ggplot(data = przyrosty) + geom_line(aes(x = Data, y = BTC)) + ggtitle("Bitcoin")
+p2 <- ggplot(data = przyrosty) + geom_line(aes(x = Data, y = ETH))+ ggtitle("Ethereum")
+p3 <- ggplot(data = przyrosty) + geom_line(aes(x = Data, y = SP500D)) + ggtitle("S&P 500")
+p4 <- ggplot(data = przyrosty) + geom_line(aes(x = Data, y = FTSE100D)) + ggtitle("FTSE 100")
+p5 <- ggplot(data = przyrosty) + geom_line(aes(x = Data, y = HSID)) + ggtitle("HSI")
+p6 <- ggplot(data = przyrosty) + geom_line(aes(x = Data, y = DAXD)) + ggtitle("DAX")
+
+figure <- ggarrange(p1, p2, p3, p4,p5,p6, ncol = 2, nrow = 3)
+figure
+```
+### **Testy na stacjonarność KPSS** ###
+```{r, warning=TRUE}
+dane2 <-dane[-c(1),] ## usuniecie pierwszego wiersza
+df <- dane2[,-c(1)]
+p_ADF <-data.frame(matrix(0,1, 6))
+p_KPSS <-data.frame(matrix(0,1, 6))
+p_ADF_none <-data.frame(matrix(0,1, 6))
+
+time_series_BTC <- ts(df[, c("BTC")]) 
+time_series_BTC <- ts(as.vector(time_series_BTC))
+p_ADF[1]=adf.test(time_series_BTC)$p.value
+p_KPSS[1]=kpss.test(time_series_BTC)$p.value
+p_ADF_none[1]=ur.df(y=time_series_BTC, type='none')
+
+time_series_ETH <- ts(df[, c("ETH")]) 
+time_series_ETH <- ts(as.vector(time_series_ETH))
+p_ADF[2]=adf.test(time_series_ETH)$p.value
+p_KPSS[2]=kpss.test(time_series_ETH)$p.value
+
+time_series_SP500D <- ts(df[, c("SP500D")]) 
+time_series_SP500D <- ts(as.vector(time_series_SP500D))
+p_ADF[3]=adf.test(time_series_SP500D)$p.value
+p_KPSS[3]=kpss.test(time_series_SP500D)$p.value
+
+time_series_FTSE100D <- ts(df[, c("FTSE100D")]) 
+time_series_FTSE100D <- ts(as.vector(time_series_FTSE100D))
+p_ADF[4]=adf.test(time_series_FTSE100D)$p.value
+p_KPSS[4]=kpss.test(ts(df[, c("FTSE100D")]))$p.value
+
+time_series_HSID <- ts(df[, c("HSID")]) 
+time_series_HSID <- ts(as.vector(time_series_HSID))
+p_ADF[5]=adf.test(time_series_HSID)$p.value
+p_KPSS[5]=kpss.test(time_series_HSID)$p.value
+
+time_series_DAXD <- ts(df[, c("DAXD")]) 
+time_series_DAXD <- ts(as.vector(time_series_DAXD))
+p_ADF[6]=adf.test(time_series_DAXD)$p.value
+p_KPSS[6]=kpss.test(time_series_DAXD)$p.value
+
+```
+
+### **Testy na stacjonarność ADF** ###
+```{r, warning=TRUE}  
+### TEST ADF NONE DRIFT TREND BEZ PRZYROSTOW
+
+ts_data <- list(
+  BTC = time_series_BTC,
+  ETH = time_series_ETH,
+  SP500D = time_series_SP500D,
+  FTSE100D = time_series_FTSE100D,
+  HSID=time_series_HSID,
+  DAXD=time_series_DAXD)
+
+types <- c("none", "drift", "trend")
+
+# Inicjalizacja listy wyników
+results <- list()
+
+for (name in names(ts_data)) {
+  serie <- ts_data[[name]]
+  results[[name]] <- list()
+  
+  for (t in types) {
+    test_result <- ur.df(serie, type = t, lags = 1)
+    results[[name]][[t]] <- test_result
+    
+    cat("\n===", name, "| type:", t, "===\n")
+    print(summary(test_result))
+  }
+}
+
+```
+
+
+```{r, fig.align="center", echo=FALSE}
+
+colnames(p_ADF) <- c("BTC", "ETH","SP500D","FTSE100D","HSID","DAX")
+
+knitr::kable(head(p_ADF), align = "cccc")
+```
+```{r, fig.align="center", echo=FALSE}
+
+colnames(p_KPSS) <- c("BTC", "ETH","SP500D","FTSE100D","HSID","DAX")
+
+knitr::kable(head(p_KPSS), align = "cccc")
+```
+
+
+#### **Testy na stacjonarność - przyrosty** #### 
+
+```{r}
+przyrosty <-przyrosty[-c(1),] ## usuniecie pierwszego wiersza
+df2 <- przyrosty[,-c(1)]
+p_ADF_przyrosty <-data.frame(matrix(0, 1, 6))
+p_KPSS_przyrosty <-data.frame(matrix(0,1, 6))
+
+time_series_BTC_p <- ts(df2[, c("BTC")]) 
+time_series_BTC_p <- ts(as.vector(time_series_BTC_p))
+p_ADF_przyrosty[1]=adf.test(time_series_BTC_p)$p.value
+p_KPSS_przyrosty[1]=kpss.test(time_series_BTC_p)$p.value
+
+time_series_ETH_p <- ts(df2[, c("ETH")]) 
+time_series_ETH_p <- ts(as.vector(time_series_ETH_p))
+p_ADF_przyrosty[2]=adf.test(time_series_ETH_p)$p.value
+p_KPSS_przyrosty[2]=kpss.test(time_series_ETH_p)$p.value
+
+time_series_SP500_p <- ts(df2[, c("SP500D")]) 
+time_series_SP500_p <- ts(as.vector(time_series_SP500_p))
+p_ADF_przyrosty[3]=adf.test(time_series_SP500_p)$p.value
+p_KPSS_przyrosty[3]=kpss.test(time_series_SP500_p)$p.value
+
+
+time_series_FTSE100_p <- ts(df2[, c("FTSE100D")]) 
+time_series_FTSE100_p <- ts(as.vector(time_series_FTSE100_p))
+p_ADF_przyrosty[4]=adf.test(time_series_FTSE100_p)$p.value
+p_KPSS_przyrosty[4]=kpss.test(time_series_FTSE100_p)$p.value
+
+time_series_HSI_p <- ts(df2[, c("HSID")]) 
+time_series_HSI_p <- ts(as.vector(time_series_HSI_p))
+p_ADF_przyrosty[5]=adf.test(time_series_HSI_p)$p.value
+p_KPSS_przyrosty[5]=kpss.test(time_series_HSI_p)$p.value
+
+time_series_DAX_p <- ts(df2[, c("DAXD")]) 
+time_series_DAX_p <- ts(as.vector(time_series_DAX_p))
+p_ADF_przyrosty[6]=adf.test(time_series_DAX_p)$p.value
+p_KPSS_przyrosty[6]=kpss.test(time_series_DAX_p)$p.value
+```
+
+
+```{r, fig.align="center", echo=FALSE}
+
+colnames(p_ADF_przyrosty) <- c("BTC", "ETH","SP500","FTSE100","HSI","DAX")
+
+knitr::kable(head(p_ADF_przyrosty), align = "cccccccc")
+```
+
+```{r, fig.align="center", echo=FALSE}
+
+colnames(p_KPSS_przyrosty) <- c("BTC", "ETH","SP500","FTSE100","HSI","DAX")
+
+knitr::kable(head(p_KPSS_przyrosty), align = "cccccccc")
+```
+```{r, warning=TRUE}  
+### TEST ADF NONE DRIFT TREND PRZYROSTY
+
+ts_data2 <- list(
+  BTC = time_series_BTC_p,
+  ETH = time_series_ETH_p,
+  SP500D = time_series_SP500_p,
+  FTSE100D = time_series_FTSE100_p,
+  HSID=time_series_HSI_p,
+  DAXD=time_series_DAX_p)
+
+types <- c("none", "drift", "trend")
+
+# Inicjalizacja listy wyników
+results2 <- list()
+
+for (name2 in names(ts_data2)) {
+  serie2 <- ts_data2[[name2]]
+  results2[[name2]] <- list()
+  
+  for (t in types) {
+    test_result2 <- ur.df(serie2, type = t, lags = 1)
+    results2[[name2]][[t]] <- test_result2
+    
+    cat("\n===", name2, "| type:", t, "===\n")
+    print(summary(test_result2))
+  }
+}
+
+```
+
+
+#### **Wybór rzędu opóźnień** #### 
+
+```{r}
+
+# obliczenie rzedu opoznien
+var_results <- VARselect(dane[,-1])
+
+var_results
+
+```
+#### **Test Johansena** #### 
+
+```{r}
+summary(ca.jo(dane[,-1], K=2, type = "eigen"))
+
+summary(ca.jo(dane[,-1], K=2, type = "trace"))
+```
+#### **Model VECM dla r = 1, rząd opóźnień = 1 ML** #### 
+
+```{r}
+#VECM ML
+model_vecm_ml <- VECM(dane[, -1], lag=1, r=1, estim = "ML")
+summary(model_vecm_ml)
+```
+
+#### **Model VECM dla r = 1, rząd opóźnień = 1 2OLS** #### 
+
+
+```{r} 
+#VECM 2OLS
+model_vecm_2ols <- VECM(dane[, -1], lag=1, r=1, estim = "2OLS")
+summary(model_vecm_2ols)
+```
+
+### **Weryfikacja modelu** ### 
+
+```{r}
+reszty_BTC <-model_vecm_ml$residuals[,1]
+reszty_ETH <-model_vecm_ml$residuals[,2]
+reszty_SP500 <-model_vecm_ml$residuals[,3]
+reszty_FTSE100 <-model_vecm_ml$residuals[,4]
+reszty_HSI <-model_vecm_ml$residuals[,5]
+reszty_DAX <-model_vecm_ml$residuals[,6]
+
+reszty_BTC2 <-model_vecm_2ols$residuals[,1]
+reszty_ETH2 <-model_vecm_2ols$residuals[,2]
+reszty_SP5002 <-model_vecm_2ols$residuals[,3]
+reszty_FTSE1002 <-model_vecm_2ols$residuals[,4]
+reszty_HSI2 <-model_vecm_2ols$residuals[,5]
+reszty_DAX2 <-model_vecm_2ols$residuals[,6]
+```
+
+### **Heteroskedastycznosc składnika losowego** ### 
+```{r, fig.align="center"}
+
+library(FinTS)
+arch_results <- as.data.frame(matrix(0, 1, 6))
+names(arch_results) <- c("Bitcoin", "Ethereum","S&P 500","FTSE 100", "HSI", "DAX")
+
+arch_results[,1] <- ArchTest(reszty_BTC, lags=5)$p.value
+arch_results[,2] <- ArchTest(reszty_ETH, lags=5)$p.value
+arch_results[,3] <- ArchTest(reszty_SP500, lags=5)$p.value
+arch_results[,4] <- ArchTest(reszty_FTSE100, lags=5)$p.value
+arch_results[,5] <- ArchTest(reszty_HSI, lags=5)$p.value
+arch_results[,6] <- ArchTest(reszty_DAX, lags=5)$p.value
+
+arch_results2 <- as.data.frame(matrix(0, 1, 6))
+names(arch_results2) <- c("Bitcoin", "Ethereum","S&P 500","FTSE 100", "HSI", "DAX")
+
+arch_results2[,1] <- ArchTest(reszty_BTC2, lags=5)$p.value
+arch_results2[,2] <- ArchTest(reszty_ETH2, lags=5)$p.value
+arch_results2[,3] <- ArchTest(reszty_SP5002, lags=5)$p.value
+arch_results2[,4] <- ArchTest(reszty_FTSE1002, lags=5)$p.value
+arch_results2[,5] <- ArchTest(reszty_HSI2, lags=5)$p.value
+arch_results2[,6] <- ArchTest(reszty_DAX2, lags=5)$p.value
+
+knitr::kable(arch_results, align = "cccccc")
+knitr::kable(arch_results2, align = "cccccc")
+``
+##### **Autokorelacja składnika losowego** ##### 
+
+```{r, fig.align="center"}
+box_results <- as.data.frame(matrix(0, 1, 6))
+names(box_results) <- c("Bitcoin", "Ethereum","S&P 500","FTSE 100", "HSI", "DAX")
+
+box_results[,1] <- Box.test(reszty_BTC)$p.value
+box_results[,2] <- Box.test(reszty_ETH)$p.value
+box_results[,3] <- Box.test(reszty_SP500)$p.value
+box_results[,4] <- Box.test(reszty_FTSE100)$p.value
+box_results[,5] <- Box.test(reszty_HSI)$p.value
+box_results[,6] <- Box.test(reszty_DAX)$p.value
+
+box_results2 <- as.data.frame(matrix(0, 1, 6))
+names(box_results2) <- c("Bitcoin", "Ethereum","S&P 500","FTSE 100", "HSI", "DAX")
+
+box_results2[,1] <- Box.test(reszty_BTC2)$p.value
+box_results2[,2] <- Box.test(reszty_ETH2)$p.value
+box_results2[,3] <- Box.test(reszty_SP5002)$p.value
+box_results2[,4] <- Box.test(reszty_FTSE1002)$p.value
+box_results2[,5] <- Box.test(reszty_HSI2)$p.value
+box_results2[,6] <- Box.test(reszty_DAX2)$p.value
+
+knitr::kable(box_results, align = "cccccc")
+knitr::kable(box_results2, align = "cccccc")
+```
+
+
+#### **Normalność składnika losowego** ##### 
+
+```{r,  fig.align="center"}
+#ML
+norm_results <- as.data.frame(matrix(0, 1, 6))
+names(norm_results) <- c("Bitcoin", "Ethereum","S&P 500","FTSE 100", "HSI", "DAX")
+
+norm_results[,1] <- shapiro.test(reszty_BTC)$p.value
+norm_results[,2] <- shapiro.test(reszty_ETH)$p.value
+norm_results[,3] <- shapiro.test(reszty_SP500)$p.value
+norm_results[,4] <- shapiro.test(reszty_FTSE100)$p.value
+norm_results[,5] <- shapiro.test(reszty_HSI)$p.value
+norm_results[,6] <- shapiro.test(reszty_DAX)$p.value
+
+knitr::kable(norm_results, align = "cccccc")
+
+
+#2OLS
+norm_results2 <- as.data.frame(matrix(0, 1, 6))
+names(norm_results2) <- c("Bitcoin", "Ethereum","S&P 500","FTSE 100", "HSI", "DAX")
+
+norm_results2[,1] <- shapiro.test(reszty_BTC2)$p.value
+norm_results2[,2] <- shapiro.test(reszty_ETH2)$p.value
+norm_results2[,3] <- shapiro.test(reszty_SP5002)$p.value
+norm_results2[,4] <- shapiro.test(reszty_FTSE1002)$p.value
+norm_results2[,5] <- shapiro.test(reszty_HSI2)$p.value
+norm_results2[,6] <- shapiro.test(reszty_DAX2)$p.value
+
+knitr::kable(norm_results2, align = "cccccc")
+```
+
+
+##### **Stacjonarność składnika losowego** ##### 
+
+```{r,  fig.align="center", warning=FALSE}
+#ML KPSS
+
+kpss_results <- as.data.frame(matrix(0, 1, 6))
+names(kpss_results) <- c("Bitcoin", "Ethereum","S&P 500","FTSE 100", "HSI", "DAX")
+
+kpss_results[,1] <- kpss.test(reszty_BTC)$p.value
+kpss_results[,2] <- kpss.test(reszty_ETH)$p.value
+kpss_results[,3] <- kpss.test(reszty_SP500)$p.value
+kpss_results[,4] <- kpss.test(reszty_FTSE100)$p.value
+kpss_results[,5] <- kpss.test(reszty_HSI)$p.value
+kpss_results[,6] <- kpss.test(reszty_DAX)$p.value
+
+knitr::kable(kpss_results, align = "cccccc")
+
+
+#2OLS KPSS
+kpss_results2 <- as.data.frame(matrix(0, 1, 6))
+names(kpss_results2) <- c("Bitcoin", "Ethereum","S&P 500","FTSE 100", "HSI", "DAX")
+
+kpss_results2[,1] <- kpss.test(reszty_BTC2)$p.value
+kpss_results2[,2] <- kpss.test(reszty_ETH2)$p.value
+kpss_results2[,3] <- kpss.test(reszty_SP5002)$p.value
+kpss_results2[,4] <- kpss.test(reszty_FTSE1002)$p.value
+kpss_results2[,5] <- kpss.test(reszty_HSI2)$p.value
+kpss_results2[,6] <- kpss.test(reszty_DAX2)$p.value
+
+knitr::kable(kpss_results2, align = "cccccc")
+```
+
+```{r,  fig.align="center", warning=FALSE}
+
+#### TEST ADF NONE DRIFT TREND RESZTY ML
+ts_data3 <- list(
+  BTC = reszty_BTC,
+  ETH =reszty_ETH,
+  SP500D =reszty_SP500,
+  FTSE100D =reszty_FTSE100,
+  HSID=reszty_HSI,
+  DAXD=reszty_DAX)
+
+types <- c("none", "drift", "trend")
+
+# Inicjalizacja listy wyników
+results3 <- list()
+
+for (name3 in names(ts_data3)) {
+  serie3 <- ts_data3[[name3]]
+  results3[[name3]] <- list()
+  
+  for (t in types) {
+    test_result3 <- ur.df(serie3, type = t, lags = 1)
+    results3[[name3]][[t]] <- test_result3
+    
+    cat("\n===", name3, "| type:", t, "===\n")
+    print(summary(test_result3))
+  }
+}
+
+```
+```{r,  fig.align="center", warning=FALSE}
+
+#### TEST ADF NONE DRIFT TREND RESZTY 2OLS
+ts_data4 <- list(
+  BTC = reszty_BTC2,
+  ETH =reszty_ETH2,
+  SP500D =reszty_SP5002,
+  FTSE100D =reszty_FTSE1002,
+  HSID=reszty_HSI2,
+  DAXD=reszty_DAX2)
+
+types <- c("none", "drift", "trend")
+
+# Inicjalizacja listy wyników
+results4 <- list()
+
+for (name4 in names(ts_data4)) {
+  serie4 <- ts_data4[[name4]]
+  results4[[name4]] <- list()
+  
+  for (t in types) {
+    test_result4 <- ur.df(serie4, type = t, lags = 1)
+    results4[[name4]][[t]] <- test_result4
+    
+    cat("\n===", name4, "| type:", t, "===\n")
+    print(summary(test_result4))
+  }
+}
+
+```
+### **IRF** ###
+```{r}
+impuls <- irf(model_vecm_ml)
+plot(impuls)
+```
+
+
